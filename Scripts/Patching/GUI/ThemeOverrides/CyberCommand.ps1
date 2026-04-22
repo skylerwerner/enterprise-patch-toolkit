@@ -48,11 +48,15 @@ function Get-MainSwitchNames {
     [CmdletBinding()]
     param()
 
-    # Find Main-Switch.ps1 relative to this script or via $scriptPath
-    $candidates = @(
-        (Join-Path $PSScriptRoot '..\Main-Switch.ps1'),
-        (Join-Path $scriptPath 'Main-Switch.ps1')
-    )
+    # Find Main-Switch.ps1 relative to this script or via $scriptPath.
+    # Skip candidates whose base path is null so Join-Path doesn't throw
+    # when the override is invoked outside a profile-loaded session
+    # ($scriptPath is set by the admin's profile in normal use).
+    # Override lives at Scripts/Patching/GUI/ThemeOverrides/;
+    # Main-Switch.ps1 is at Scripts/ -- three levels up.
+    $candidates = @()
+    if ($PSScriptRoot) { $candidates += (Join-Path $PSScriptRoot '..\..\..\Main-Switch.ps1') }
+    if ($scriptPath)   { $candidates += (Join-Path $scriptPath 'Main-Switch.ps1') }
 
     $mainSwitchPath = $null
     foreach ($c in $candidates) {
