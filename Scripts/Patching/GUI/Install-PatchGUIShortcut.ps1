@@ -29,8 +29,8 @@
         Date: 2026/04/21
         Version 1.0.0
     .PARAMETER RepoRoot
-        Root of the Remediation-Script-Library repo. Defaults to the
-        grandparent of this script (Scripts/Patching/GUI -> repo root).
+        Root of the toolkit repo. Defaults to the grandparent of
+        this script (Scripts/Patching/GUI -> repo root).
     .PARAMETER Name
         Display name / file base used for both shortcut files. Default
         'Invoke-Patch' so the icon label matches the CLI command name

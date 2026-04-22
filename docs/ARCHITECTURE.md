@@ -1,6 +1,6 @@
 # Architecture Notes
 
-This document covers the non-obvious design patterns in the Remediation Script Library. It assumes familiarity with PowerShell 5.1 and remoting basics (WinRM, `Invoke-Command`, PSSessions).
+This document covers the non-obvious design patterns in the Enterprise Patch Toolkit. It assumes familiarity with PowerShell 5.1 and remoting basics (WinRM, `Invoke-Command`, PSSessions).
 
 ## Contents
 

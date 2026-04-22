@@ -1,7 +1,7 @@
 # DOTS formatting comment
 
 # -----------------------------------------------------------------------------
-# Environment configuration for the Remediation Script Library
+# Environment configuration for the Enterprise Patch Toolkit
 # -----------------------------------------------------------------------------
 # This file declares environment-specific values (domains, file shares,
 # trusted runner hosts, org tags) so that the scripts themselves stay
