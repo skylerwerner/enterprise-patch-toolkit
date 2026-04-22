@@ -1,4 +1,4 @@
-# Remediation Script Library
+# Enterprise Patch Toolkit
 
 Written by [Skyler Werner](mailto:skyler.werner@gmail.com).
 
