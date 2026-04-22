@@ -15,7 +15,7 @@ PowerShell 5.1 toolkit for concurrent patching, remote remediation, and software
 - An environment-config layer (`Config\Environment.psd1` + `RSL-Environment` module) that keeps all org-specific values -- domain names, file-share UNCs, trusted runner hostnames, CMDB tags -- out of the scripts themselves, so the whole repo drops into a new environment by editing one file.
 - Battle-tested against a known hazard of the platform: the double-serialization boundary introduced when `Invoke-RunspacePool` jobs call `Invoke-Command` into remote sessions. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the pattern.
 
-> **Portfolio note:** This is a sanitized copy of a toolkit I built and maintained in production on the Marine Corps Enterprise Network (MCEN), covering a multi-thousand-endpoint Windows fleet. Organization-specific identifiers (domains, share names, hostnames, CMDB tags) have been replaced with placeholders in [Config/Environment.example.psd1](Config/Environment.example.psd1) so the repo runs cleanly in any environment.
+> **Portfolio note:** This is a sanitized copy of a toolkit I built and maintained in production on the Marine Corps Enterprise Network (MCEN), covering a multi-thousand-endpoint Windows fleet. Production values for the env-config layer above ship here as placeholders in [Config/Environment.example.psd1](Config/Environment.example.psd1).
 
 ---
 
