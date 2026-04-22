@@ -25,7 +25,7 @@ If you are reviewing this for an interview and want the short tour, read these f
 
 1. **[Modules/Invoke-RunspacePool/Invoke-RunspacePool.psm1](Modules/Invoke-RunspacePool/Invoke-RunspacePool.psm1)** -- The concurrency engine the rest of the toolkit is built on. Wraps a .NET `RunspacePool` with per-task timeouts, a unified progress bar, and a guaranteed result shape.
 2. **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** -- Deep dive on the runspace + `Invoke-Command` double-serialization boundary. This is the single most load-bearing detail in the codebase and the most interesting thing I learned building it.
-3. **[Scripts/Patching/Invoke-Patch.ps1](Scripts/Patching/Invoke-Patch.ps1)** -- The orchestrator. Shows the runspace pool in anger: dynamic timeout from patch size, ping/DNS/version-check/copy/execute/verify pipeline, uniform result-table output.
+3. **[Scripts/Patching/Invoke-Patch.ps1](Scripts/Patching/Invoke-Patch.ps1)** -- The orchestrator. Shows the runspace pool in a production workload: dynamic timeout from patch size, ping/DNS/version-check/copy/execute/verify pipeline, uniform result-table output.
 4. **[Modules/Merge-MainSwitch/Merge-MainSwitch.psm1](Modules/Merge-MainSwitch/Merge-MainSwitch.psm1)** -- Content-aware three-way merge for the central `Main-Switch.ps1` config file across multiple admins. The "switch-case level" merge resolves independent per-software edits cleanly without manual conflict resolution.
 
 ---
