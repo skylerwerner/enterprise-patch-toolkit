@@ -264,7 +264,23 @@ To add a new patchable application, add a new case to the `switch` block in `Scr
 
 `Invoke-PatchGUI` is a WPF front-end for `Invoke-Patch` and `Invoke-Version`. Same concurrent engine, same result schema, same sort order -- just rendered as a dialog instead of a prompt, for admins who prefer a clickable interface to a CLI.
 
+### Themes
+
+The GUI ships with twelve built-in themes. The gallery previews all twelve; pick one and the GUI relaunches in that theme, persisting the choice across sessions.
+
+![Theme gallery showing 12 theme cards arranged in a 4x3 grid, each with name, descriptor, and color palette swatches](docs/screenshots/00%20-%20Theme%20Gallery.png)
+
+Both light and dark palettes are first-class. Cobalt Slate Day is the light variant of the flagship theme:
+
+![Cobalt Slate Day -- light mode variant of the Cobalt Slate flagship theme, rendering the same populated results grid](docs/screenshots/02%20-%20Default%20Theme%20Light%20Mode.png)
+
+Several themes render with gradient accents. Tokyo Night's progress bar transitions from cyan through violet to pink during a run:
+
 ![Tokyo Night theme mid-run, 50% through patching 15 machines, with the cyan-pink gradient progress bar](docs/screenshots/03%20-%20Tokyo%20Night%20Running.png)
+
+Themes can also define their own XAML for non-standard layouts. CyberPunk Console replaces the canonical header with a bracketed HUD title, uses electric cyan on pure black throughout, and renames Run and Cancel to EXECUTE and ABORT:
+
+![CyberPunk Console override theme -- electric cyan on pure black, bracketed HUD header, and EXECUTE / ABORT buttons](docs/screenshots/05%20-%20CyberPunk%20Console.png)
 
 ### Parameter Parity
 
@@ -275,20 +291,6 @@ Invoke-Patch -TargetSoftware Photoshop -Force -CollectLogs -Timeout 30
 ```
 
 ![Dark Forest theme with Force and CollectLogs checked and Total Timeout set to 30 minutes](docs/screenshots/06%20-%20Dark%20Forest.png)
-
-### Themes
-
-Twelve built-in themes. The gallery previews all twelve; pick one and the GUI relaunches in that theme, persisting the choice across sessions.
-
-![Theme gallery showing 12 theme cards arranged in a 4x3 grid, each with name, descriptor, and color palette swatches](docs/screenshots/00%20-%20Theme%20Gallery.png)
-
-Both light and dark palettes are first-class. Cobalt Slate Day is the light variant of the flagship theme:
-
-![Cobalt Slate Day -- light mode variant of the Cobalt Slate flagship theme, rendering the same populated results grid](docs/screenshots/02%20-%20Default%20Theme%20Light%20Mode.png)
-
-Themes can define their own XAML for non-standard layouts. CyberPunk Console replaces the canonical header with a bracketed HUD title, uses electric cyan on pure black throughout, and renames Run and Cancel to EXECUTE and ABORT:
-
-![CyberPunk Console override theme -- electric cyan on pure black, bracketed HUD header, and EXECUTE / ABORT buttons](docs/screenshots/05%20-%20CyberPunk%20Console.png)
 
 ---
 
