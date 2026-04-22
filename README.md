@@ -189,21 +189,31 @@ Invoke-Patch -TS Edge -TM WORKSTATION01
 6. **Results** -- Returns a table with columns: IP, ComputerName, Status, SoftwareName, Version, Compliant, NewVersion, ExitCode, Comment, AdminName, Date.
 
 ```mermaid
-flowchart LR
-    A([Invoke-Patch<br/>-TargetSoftware Edge])
-    B[Config lookup<br/>Main-Switch.ps1]
-    C[List prep +<br/>validation]
-    D[Dynamic timeout<br/>from patch size]
+flowchart TD
+    A([Invoke-Patch -TargetSoftware Edge])
+    subgraph Setup["Setup - runs once"]
+        direction TB
+        B[Config lookup<br/>Main-Switch.ps1]
+        C[List prep +<br/>validation]
+        D[Dynamic timeout<br/>from patch size]
+        B --> C --> D
+    end
     E{{Invoke-RunspacePool<br/>per-machine fan-out}}
-    F[Ping]
-    G[DNS]
-    H[Version check<br/>Invoke-Command]
-    I["Copy patch<br/>(hash-verified)"]
-    J[Execute deploy<br/>script]
-    K[Post-install<br/>verify]
-    L([Uniform result<br/>table])
-    A --> B --> C --> D --> E
-    E --> F --> G --> H --> I --> J --> K --> L
+    subgraph PerMachine["Per-machine pipeline - runs in parallel"]
+        direction TB
+        F[Ping]
+        G[DNS resolution]
+        H[Version check<br/>via Invoke-Command]
+        I["Copy patch<br/>(hash-verified)"]
+        J[Execute deploy<br/>script]
+        K[Post-install<br/>verify]
+        F --> G --> H --> I --> J --> K
+    end
+    L([Uniform result table])
+    A --> Setup
+    Setup --> E
+    E --> PerMachine
+    PerMachine --> L
 ```
 
 ### Target Machine Lists
