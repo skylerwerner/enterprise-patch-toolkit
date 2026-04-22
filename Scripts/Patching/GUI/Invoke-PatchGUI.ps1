@@ -1400,7 +1400,12 @@ function New-MockPatchResults {
                 SoftwareName = $SoftwareName
                 Version      = $oldVer
                 Compliant    = $false
-                NewVersion   = if ($gotNew) { $newVer } else { $oldVer }
+                # Match real Invoke-Patch: when the install doesn't
+                # change the detected version (attempt failed), the
+                # cmdlet rewrites NewVersion to "No Change". This also
+                # bubbles failed rows to the top of each Version block
+                # under the NewVersion-DESC sort.
+                NewVersion   = if ($gotNew) { $newVer } else { 'No Change' }
                 ExitCode     = $exitCode
                 Comment      = $comment
                 AdminName    = $user
