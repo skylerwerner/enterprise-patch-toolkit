@@ -84,6 +84,73 @@ function Get-MainSwitchNames {
 }
 
 
+function Get-MainSwitchListPaths {
+    <#
+        .SYNOPSIS
+            Returns a hashtable mapping each software name to its listPath.
+        .DESCRIPTION
+            Parses Main-Switch.ps1 line by line to find each case header
+            ("Name" {) and the first $listPath assignment inside it.
+            Expands $listPathRoot and $env: variables.
+
+            Avoids dot-sourcing Main-Switch entirely -- dot-sourcing fails
+            in the GUI runspace because Main-Switch calls Get-Command
+            against per-software patch scripts that do not resolve in a
+            fresh context. A silent catch would swallow that error and
+            produce an empty map, so the Machine field never populated.
+    #>
+    [CmdletBinding()]
+    param()
+
+    # Skip candidates whose base path is null so Join-Path doesn't throw
+    # when the script is launched outside a profile-loaded session.
+    # Override lives at Scripts/Patching/GUI/ThemeOverrides/;
+    # Main-Switch.ps1 is at Scripts/ -- three levels up.
+    $candidates = @()
+    if ($PSScriptRoot) { $candidates += (Join-Path $PSScriptRoot '..\..\..\Main-Switch.ps1') }
+    if ($scriptPath)   { $candidates += (Join-Path $scriptPath 'Main-Switch.ps1') }
+
+    $mainSwitchPath = $null
+    foreach ($c in $candidates) {
+        if (Test-Path $c) {
+            $mainSwitchPath = (Resolve-Path $c).Path
+            break
+        }
+    }
+
+    if (-not $mainSwitchPath) { return @{} }
+
+    # Context variable referenced by listPath values in Main-Switch.
+    # ExpandString below resolves $listPathRoot against this scope.
+    $listPathRoot = "$env:USERPROFILE\Desktop\Lists"
+
+    $map         = @{}
+    $currentCase = $null
+
+    foreach ($line in (Get-Content -Path $mainSwitchPath -Encoding Default)) {
+        # Case header: indented "Name" followed by opening brace
+        if ($line -match '^\s*"([^"]+)"\s*\{') {
+            $currentCase = $Matches[1]
+            continue
+        }
+
+        # First $listPath assignment inside an active case
+        if ($currentCase -and
+            $line -match '^\s*\$listPath\s*=\s*"([^"]+)"') {
+            $rawPath = $Matches[1]
+            try {
+                $expanded = $ExecutionContext.InvokeCommand.ExpandString($rawPath)
+                $map[$currentCase] = $expanded
+            }
+            catch { }
+            $currentCase = $null   # done; ignore further assignments in this case
+        }
+    }
+
+    return $map
+}
+
+
 # ============================================================================
 #  XAML Window Definition
 # ============================================================================
@@ -761,6 +828,21 @@ if ($softwareNames.Count -eq 0) {
 foreach ($sw in $softwareNames) {
     $cmbSoftware.Items.Add($sw) > $null
 }
+
+# Load listPath mapping from Main-Switch so the Machine field can
+# auto-populate when the admin picks a software target.
+$script:listPathMap = Get-MainSwitchListPaths
+
+# Auto-populate Machine field with the selected software's listPath.
+# Admins can still overwrite with a single computer name or a different
+# file path; the Run handler routes -TargetList vs -TargetMachine based
+# on what's actually in the box.
+$cmbSoftware.Add_SelectionChanged({
+    $selected = $cmbSoftware.SelectedItem
+    if ($selected -and $script:listPathMap.ContainsKey($selected)) {
+        $txtMachine.Text = $script:listPathMap[$selected]
+    }
+})
 
 if ($DryRun) {
     $window.Title = "Invoke-Patch  [DryRun Mode]"
