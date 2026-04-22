@@ -1207,8 +1207,8 @@ function Set-SampleMode {
     } else {
         $lblTitle.Text = "Invoke-$NewMode"
     }
-    # Subtitle text: themes can override for identity (e.g. 3D Network Bn
-    # uses its unit name), otherwise defaults to the generic
+    # Subtitle text: themes can override for identity (e.g. TeamIdentity
+    # uses a team-name placeholder), otherwise defaults to the generic
     # "Patch Remediation" / "Version Audit".
     $subPatch   = if ($script:activeTheme.ContainsKey('SubtitlePatch'))   { $script:activeTheme.SubtitlePatch }   else { 'Patch Remediation' }
     $subVersion = if ($script:activeTheme.ContainsKey('SubtitleVersion')) { $script:activeTheme.SubtitleVersion } else { 'Version Audit' }

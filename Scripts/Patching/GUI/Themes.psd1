@@ -326,9 +326,9 @@
         ToggleOnBorder = '#3FDCD0'
     }
 
-    '3DNetworkBn' = @{
-        Name       = '3D Network Bn'
-        Vibe       = 'Unit logo-themed navy'
+    TeamIdentity = @{
+        Name       = 'Team Identity'
+        Vibe       = 'Branded dark navy with subtitle-override identity'
         Bg         = '#0A1020'
         Surface    = '#101830'
         Overlay    = '#182038'
@@ -343,12 +343,12 @@
         RunStyle        = 'ghost'
         RunGhostBg      = '#0E2848'
         ToggleOnBorder  = '#88DCFC'
-        SubtitlePatch   = '3d Network Bn | Remediation'
-        SubtitleVersion = '3d Network Bn | Audit'
+        SubtitlePatch   = 'YOUR TEAM | Remediation'
+        SubtitleVersion = 'YOUR TEAM | Audit'
     }
 
     TacticalChrome = @{
-        Name       = '3D Network Bn Chrome'
+        Name       = 'Tactical Chrome'
         Vibe       = 'Chrome gradient, tactical'
         Bg         = '#08101C'
         Surface    = '#0C1828'

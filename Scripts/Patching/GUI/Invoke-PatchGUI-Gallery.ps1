@@ -42,7 +42,7 @@ $script:DisplayOrder = @(
     'IndustrialCharcoal', 'LightPurpleGray',
     'DarkForest', 'NavyAnalytics', 'PureMonochrome',
     'BlueCorporate', 'TaniumInspired',
-    'LogitechTeal', '3DNetworkBn',
+    'LogitechTeal', 'TeamIdentity',
     'TacticalChrome', 'CyberCommand'
 )
 
