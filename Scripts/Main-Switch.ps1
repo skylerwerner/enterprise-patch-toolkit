@@ -1,5 +1,27 @@
 ﻿# DOTS formatting comment
 
+<#
+    .SYNOPSIS
+        Central software catalog - one switch-case per patchable application.
+    .DESCRIPTION
+        Main-Switch.ps1 is the single source of truth for every patchable
+        application in the environment. Invoke-Patch and Invoke-Version
+        dot-source this file, set $TargetSoftware to a case label, and read
+        back a standard set of variables: $software, $listPath, $compliantVer,
+        $patchPath, $patchScript, $installLine, $processName, etc.
+
+        Adding a new patchable application is a one-case change - see the
+        "Adding New Software" section of the README for the template.
+
+        Multiple admins maintain their own local copies of this file; the
+        Merge-MainSwitch module performs a content-aware three-way merge at
+        the switch-case level so independent edits to different software
+        entries reconcile cleanly against the central copy without manual
+        conflict resolution.
+
+        Written by Skyler Werner
+#>
+
 $scriptRoot    = $scriptPath
 $patchRoot     = "M:\Share\VMT\Patches" # Patch folder goes here
 $listPathRoot  = "$env:USERPROFILE\Desktop\Lists"   # List  folder goes here

@@ -1,8 +1,36 @@
 # DOTS formatting comment
 
+<#
+    .SYNOPSIS
+        Deploys a patch across a fleet of Windows endpoints concurrently.
+    .DESCRIPTION
+        Primary orchestrator for the toolkit. Resolves a software definition from
+        Main-Switch.ps1, builds the target list, and fans deployment out across
+        the fleet via Invoke-RunspacePool. Per machine, runs the pipeline:
+
+            ping -> DNS resolution -> version check -> copy patch files
+                 -> execute deploy script -> post-install verify
+
+        Timeout is derived dynamically from patch file size (small = 35 min,
+        large = up to 120 min) and can be overridden. Results come back as a
+        uniform table regardless of per-machine success, failure, or timeout,
+        so downstream Format-Table / Export-Csv consumers never have to
+        special-case missing rows.
+
+        Written by Skyler Werner
+    .EXAMPLE
+        Invoke-Patch -TargetSoftware Edge
+        Patches every machine listed in Desktop\Lists\Microsoft_Edge.txt.
+    .EXAMPLE
+        Invoke-Patch -TS Chrome -TM WORKSTATION01
+        Patches a single machine, using the short parameter aliases.
+    .EXAMPLE
+        Invoke-Patch -TargetSoftware Edge -ConfirmTimeout -CollectLogs
+        Deploys with interactive confirmation before killing timed-out tasks
+        and copies per-machine install logs back to the operator's desktop.
+#>
 
 function Invoke-Patch {
-    # Start Function
     [CmdletBinding()]
     param(
         # Enter the software name. Make sure the software exists in the Main Switch.

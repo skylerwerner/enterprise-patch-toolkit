@@ -1,6 +1,29 @@
 # DOTS formatting comment
 
-function Invoke-Version { # Start Function
+<#
+    .SYNOPSIS
+        Audits installed software versions across a fleet of machines.
+    .DESCRIPTION
+        Read-only companion to Invoke-Patch. Resolves a software definition
+        from Main-Switch.ps1 and checks each target machine's installed
+        version concurrently via Invoke-RunspacePool. Returns the same
+        uniform result-table schema as Invoke-Patch, minus the copy /
+        install / verify steps - just version inventory.
+
+        Useful before a deployment to see how many machines actually need
+        the patch, and after a deployment to confirm compliance without
+        re-running the full orchestrator.
+
+        Written by Skyler Werner
+    .EXAMPLE
+        Invoke-Version -TargetSoftware Edge
+        Check Edge version across every machine in Desktop\Lists\Microsoft_Edge.txt.
+    .EXAMPLE
+        Invoke-Version -TS Chrome -TM WORKSTATION01
+        Check Chrome version on a single machine via short aliases.
+#>
+
+function Invoke-Version {
     [CmdletBinding()]
     param(
         # Enter the software name. Make sure the software exists in the Main Switch.
