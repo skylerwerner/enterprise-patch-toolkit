@@ -1308,8 +1308,16 @@ function New-MockPatchResults {
         [string]$SoftwareName,
         [ValidateSet('Patch','Version')]
         [string]$Mode = 'Patch',
-        [int]$Count = 15
+        [int]$Count = 15,
+        [string[]]$ComputerName
     )
+
+    # If caller supplied an explicit hostname list, drive the row count
+    # from it and render those names verbatim. Otherwise fall back to
+    # synthesized PC001-style names (keeps behaviour for callers that
+    # just want N rows of plausible-looking data).
+    $useProvidedNames = ($null -ne $ComputerName) -and (@($ComputerName).Count -gt 0)
+    if ($useProvidedNames) { $Count = @($ComputerName).Count }
 
     $isVersionMode = ($Mode -eq 'Version')
     $rng       = New-Object System.Random
@@ -1327,8 +1335,12 @@ function New-MockPatchResults {
     $results = @()
     for ($i = 1; $i -le $Count; $i++) {
         $status  = $statuses[$rng.Next($statuses.Count)]
-        $prefix  = $prefixes[$rng.Next($prefixes.Count)]
-        $machine = "$prefix$($i.ToString('D3'))"
+        $machine = if ($useProvidedNames) {
+            $ComputerName[$i - 1]
+        } else {
+            $prefix = $prefixes[$rng.Next($prefixes.Count)]
+            "$prefix$($i.ToString('D3'))"
+        }
         $octA    = $rng.Next(10, 11)
         $octB    = $rng.Next(1, 5)
         $octC    = $rng.Next(1, 255)
@@ -1517,9 +1529,31 @@ $btnRun.Add_Click({
     # ----------------------------------------------------------------
     if ($DryRun) {
 
+        # Resolve the Machine field into an explicit hostname list so the
+        # mock generator renders the user's targets verbatim. Mirrors the
+        # live-mode path / single-machine handling below. Falls back to
+        # the generator's synthesized names when nothing resolves.
+        $script:dryRunNames = @()
+        $dryText = $txtMachine.Text.Trim()
+        if ($dryText) {
+            $isPath = ($dryText -match '[\\/]') -or ($dryText -match '\.[a-zA-Z]+$')
+            if ($isPath -and (Test-Path $dryText)) {
+                $script:dryRunNames = @(
+                    Get-Content -Path $dryText -ErrorAction SilentlyContinue |
+                        Where-Object { $_ -and $_ -notmatch '^\s*#' } |
+                        ForEach-Object { $_.Trim() } |
+                        Where-Object { $_ }
+                )
+            }
+            elseif (-not $isPath) {
+                $script:dryRunNames = @($dryText)
+            }
+        }
+
         $dryLabel = if ($script:mode -eq 'Version') { 'version check' }
                     else                            { 'patching' }
-        $lblStatus.Text         = "[DryRun] Simulating $selectedSoftware $dryLabel..."
+        $dryCount = if ($script:dryRunNames.Count) { $script:dryRunNames.Count } else { 15 }
+        $lblStatus.Text         = "[DryRun] Simulating $selectedSoftware $dryLabel on $dryCount machines..."
         $prgBar.IsIndeterminate = $true
 
         $script:dryRunTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -1545,6 +1579,9 @@ $btnRun.Add_Click({
                     SoftwareName = $script:selectedSoftware
                     Count        = 15
                     Mode         = $script:mode
+                }
+                if ($script:dryRunNames -and $script:dryRunNames.Count -gt 0) {
+                    $mockParams.ComputerName = $script:dryRunNames
                 }
                 $script:resultData = @(New-MockPatchResults @mockParams)
                 Complete-RunWithResults -Results $script:resultData
