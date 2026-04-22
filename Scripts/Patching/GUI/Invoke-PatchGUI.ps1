@@ -1829,8 +1829,15 @@ $btnTheme.Add_Click({
         return
     }
 
-    Start-Process -FilePath 'powershell.exe' `
-                  -ArgumentList '-NoProfile', '-File', $galleryPath
+    # Forward session switches so they survive the Gallery -> main-GUI
+    # relaunch cycle. -DryRun must not silently drop when the user picks
+    # a new theme mid-session. -Mode reads the live toggle state (not
+    # the launch-time param) so if the user flipped to Version before
+    # opening the Gallery, they come back in Version.
+    $argList = @('-NoProfile', '-File', $galleryPath)
+    if ($DryRun)        { $argList += '-DryRun' }
+    if ($script:mode)   { $argList += @('-Mode', $script:mode) }
+    Start-Process -FilePath 'powershell.exe' -ArgumentList $argList
     $window.Close()
 })
 

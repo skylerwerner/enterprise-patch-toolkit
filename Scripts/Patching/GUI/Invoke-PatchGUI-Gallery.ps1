@@ -14,10 +14,31 @@
 
         Written by Skyler Werner
         Date: 2026/04/16
-        Version 2.0.0
+        Version 2.1.0
+    .PARAMETER DryRun
+        Forwarded from the main GUI when the theme picker is opened from
+        an in-flight DryRun session. The flag is passed back to
+        Invoke-PatchGUI.ps1 on theme-card click so DryRun mode survives
+        the relaunch. Not intended for direct CLI use.
+    .PARAMETER Mode
+        Forwarded from the main GUI's live toggle state (Patch or
+        Version) at the moment the theme picker was opened. Passed back
+        to Invoke-PatchGUI.ps1 on theme-card click so the user returns
+        to the mode they were in. Not intended for direct CLI use.
     .EXAMPLE
         .\Invoke-PatchGUI-Gallery.ps1
 #>
+
+param(
+    [switch]$DryRun,
+    [ValidateSet('Patch','Version')]
+    [string]$Mode
+)
+
+# Capture the session flags into script scope so the card-click closure
+# can read them when spawning the new Invoke-PatchGUI process.
+$script:SessionDryRun = [bool]$DryRun.IsPresent
+$script:SessionMode   = $Mode
 
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
@@ -293,8 +314,12 @@ function New-ThemeCard {
         Set-PatchPreferences -Preferences $prefs
 
         if (Test-Path $script:PatchGUI) {
-            Start-Process -FilePath 'powershell.exe' `
-                          -ArgumentList '-NoProfile', '-File', $script:PatchGUI
+            # Forward session flags so DryRun and the live Patch/Version
+            # toggle state both survive the theme-change relaunch.
+            $argList = @('-NoProfile', '-File', $script:PatchGUI)
+            if ($script:SessionDryRun) { $argList += '-DryRun' }
+            if ($script:SessionMode)   { $argList += @('-Mode', $script:SessionMode) }
+            Start-Process -FilePath 'powershell.exe' -ArgumentList $argList
         }
         $window = [System.Windows.Window]::GetWindow($this)
         if ($window) { $window.Close() }
