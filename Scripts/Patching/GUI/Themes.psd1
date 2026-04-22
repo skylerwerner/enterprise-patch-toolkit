@@ -136,8 +136,8 @@
         TitleStyle       = 'gradient'
     }
 
-    MonochromaticTeal = @{
-        Name       = 'Monochromatic Teal'
+    Meridian = @{
+        Name       = 'Meridian'
         Vibe       = 'Moody teal dashboard'
         Bg         = '#070A0B'
         Surface    = '#0C1315'
@@ -174,27 +174,8 @@
         ToggleOnBorder = '#B88CE0'
     }
 
-    IndustrialCharcoal = @{
-        Name       = 'Industrial Charcoal'
-        Vibe       = 'Hardware / audio equipment'
-        Bg         = '#252525'
-        Surface    = '#2E2E2E'
-        Overlay    = '#383838'
-        Border     = '#444444'
-        Hover      = '#4A4440'
-        Text       = '#D8D4D0'
-        HeaderText = '#C8C4C0'
-        SubText    = '#A09C98'
-        Blue           = '#D08040'
-        Green          = '#D08040'
-        Red            = '#A06838'
-        RunStyle       = 'ghost'
-        RunGhostBg     = '#3A3020'
-        ToggleOnBorder = '#E8A060'
-    }
-
-    LightPurpleGray = @{
-        Name       = 'Light Purple-Gray'
+    Quartz = @{
+        Name       = 'Quartz'
         Vibe       = 'Slate corporate analytics'
         Bg         = '#C8C8D0'
         Surface    = '#D8D8E0'
@@ -204,11 +185,11 @@
         Text       = '#2A2A34'
         HeaderText = '#2A2A34'
         SubText    = '#6A6A78'
-        Blue           = '#E05830'
-        Green          = '#E05830'
-        Red            = '#C04828'
+        Blue           = '#C85030'
+        Green          = '#C85030'
+        Red            = '#A84028'
         AccentText     = '#FFFFFF'   # Bg is light gray which fails contrast on coral
-        ToggleOnBorder = '#C04828'   # darker coral shadow rim (not lighter)
+        ToggleOnBorder = '#A84028'   # darker coral shadow rim (not lighter)
     }
 
     DarkForest = @{
@@ -251,8 +232,8 @@
         ToggleOnBorder = '#F0C060'
     }
 
-    PureMonochrome = @{
-        Name          = 'Pure Monochrome'
+    Monochrome = @{
+        Name          = 'Monochrome'
         Vibe          = 'Crypto / fintech, split title'
         Bg            = '#121212'
         Surface       = '#1C1C1C'
@@ -268,23 +249,6 @@
         TitleStyle     = 'split'
         TitleDimColor  = '#BEBEBE'
         ToggleOnBorder = '#FFFFFF'
-    }
-
-    BlueCorporate = @{
-        Name       = 'Blue Corporate'
-        Vibe       = 'Teams / Azure vibe'
-        Bg         = '#1B1B20'
-        Surface    = '#232328'
-        Overlay    = '#2C2C34'
-        Border     = '#3A3A44'
-        Hover      = '#2E3448'
-        Text       = '#E0E2E8'
-        HeaderText = '#C8CCD8'
-        SubText    = '#8088A0'
-        Blue           = '#4A90E2'
-        Green          = '#4A90E2'
-        Red            = '#3870B8'
-        ToggleOnBorder = '#70AEEC'
     }
 
     TaniumInspired = @{
@@ -307,8 +271,8 @@
         ToggleOnBorder = '#78B4E8'
     }
 
-    LogitechTeal = @{
-        Name          = 'Logitech Teal'
+    CarbonTeal = @{
+        Name          = 'Carbon Teal'
         Vibe          = 'Split title, high readability'
         Bg            = '#181818'
         Surface       = '#222222'
@@ -324,43 +288,6 @@
         TitleStyle     = 'split'
         TitleDimColor  = '#B8B8B8'
         ToggleOnBorder = '#3FDCD0'
-    }
-
-    TeamIdentity = @{
-        Name       = 'Team Identity'
-        Vibe       = 'Branded dark navy with subtitle-override identity'
-        Bg         = '#0A1020'
-        Surface    = '#101830'
-        Overlay    = '#182038'
-        Border     = '#283858'
-        Hover      = '#1C2C50'
-        Text       = '#D0D8E8'
-        HeaderText = '#B8C8DC'
-        SubText    = '#8090B0'
-        Blue            = '#58C8F0'
-        Green           = '#58C8F0'
-        Red             = '#4898C0'
-        RunStyle        = 'ghost'
-        RunGhostBg      = '#0E2848'
-        ToggleOnBorder  = '#88DCFC'
-        SubtitlePatch   = 'YOUR TEAM | Remediation'
-        SubtitleVersion = 'YOUR TEAM | Audit'
-    }
-
-    TacticalChrome = @{
-        Name       = 'Tactical Chrome'
-        Vibe       = 'Chrome gradient, tactical'
-        Bg         = '#08101C'
-        Surface    = '#0C1828'
-        Overlay    = '#142030'
-        Border     = '#A0B0C0'
-        Hover      = '#102040'
-        Text       = '#D0DCE8'
-        HeaderText = '#C8D4E0'
-        SubText    = '#90A0B0'
-        Blue       = '#C0D0E0'
-        Green      = '#40D0F0'
-        Red        = '#708898'
     }
 
     CyberCommand = @{

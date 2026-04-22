@@ -35,15 +35,13 @@ $script:AllThemes  = Import-PowerShellDataFile -Path $script:ThemesPath
 $script:PatchGUI   = Join-Path $PSScriptRoot 'Invoke-PatchGUI.ps1'
 
 # Display order -- pairs Cobalt Slate dark with its Day sibling up top,
-# then the rest roughly in sample-number order, jokes (98/99) at the end.
+# then the rest roughly in sample-number order, joke theme at the end.
 $script:DisplayOrder = @(
     'CobaltSlate', 'CobaltSlateDay',
-    'TokyoNight', 'MonochromaticTeal', 'UltraDarkViolet',
-    'IndustrialCharcoal', 'LightPurpleGray',
-    'DarkForest', 'NavyAnalytics', 'PureMonochrome',
-    'BlueCorporate', 'TaniumInspired',
-    'LogitechTeal', 'TeamIdentity',
-    'TacticalChrome', 'CyberCommand'
+    'TokyoNight', 'Meridian', 'UltraDarkViolet',
+    'Quartz', 'DarkForest', 'NavyAnalytics',
+    'Monochrome', 'TaniumInspired', 'CarbonTeal',
+    'CyberCommand'
 )
 
 function Get-PatchPreferences {
