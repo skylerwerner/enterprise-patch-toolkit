@@ -88,7 +88,7 @@ function Get-MainSwitchNames {
 <Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="[ INVOKE-PATCH // CYBER COMMAND ]"
+    Title="[ INVOKE-PATCH // CYBERPUNK CONSOLE ]"
     Width="1050" Height="780"
     MinWidth="900" MinHeight="650"
     WindowStartupLocation="CenterScreen"
@@ -354,7 +354,7 @@ function Get-MainSwitchNames {
         </Style>
 
         <!-- ============================================================ -->
-        <!--  Mode slider toggle - CYBER COMMAND (electric cyan)           -->
+        <!--  Mode slider toggle - CYBERPUNK CONSOLE (electric cyan)       -->
         <!--  Checked   = Patch mode (knob right, cyan track)              -->
         <!--  Unchecked = Audit mode (knob left, dim track)                -->
         <!-- ============================================================ -->
@@ -764,7 +764,7 @@ if ($DryRun) {
 
 
 # ============================================================================
-#  Mode slider (Patch <-> Audit) - CYBER COMMAND
+#  Mode slider (Patch <-> Audit) - CYBERPUNK CONSOLE
 # ============================================================================
 
 $script:mode = 'Patch'

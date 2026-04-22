@@ -291,7 +291,7 @@
     }
 
     CyberCommand = @{
-        Name       = 'CYBER COMMAND'
+        Name       = 'CyberPunk Console'
         Vibe       = 'Neon cyan on pure black'
         Bg         = '#000000'
         Surface    = '#080810'
