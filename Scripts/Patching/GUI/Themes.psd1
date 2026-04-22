@@ -138,7 +138,7 @@
 
     Meridian = @{
         Name       = 'Meridian'
-        Vibe       = 'Moody teal dashboard'
+        Vibe       = 'Naval charts, deep teal'
         Bg         = '#070A0B'
         Surface    = '#0C1315'
         Overlay    = '#121C1E'
@@ -176,7 +176,7 @@
 
     Quartz = @{
         Name       = 'Quartz'
-        Vibe       = 'Slate corporate analytics'
+        Vibe       = 'Pale mineral, ember accent'
         Bg         = '#C8C8D0'
         Surface    = '#D8D8E0'
         Overlay    = '#E2E2EA'
@@ -234,7 +234,7 @@
 
     Monochrome = @{
         Name          = 'Monochrome'
-        Vibe          = 'Crypto / fintech, split title'
+        Vibe          = 'Ink on paper'
         Bg            = '#121212'
         Surface       = '#1C1C1C'
         Overlay       = '#2A2A2A'
@@ -273,7 +273,7 @@
 
     CarbonTeal = @{
         Name          = 'Carbon Teal'
-        Vibe          = 'Split title, high readability'
+        Vibe          = 'Carbon fiber, teal accents'
         Bg            = '#181818'
         Surface       = '#222222'
         Overlay       = '#2C2C2C'
@@ -292,7 +292,7 @@
 
     CyberCommand = @{
         Name       = 'CYBER COMMAND'
-        Vibe       = 'Hollywood hacking prop'
+        Vibe       = 'Movie-hacker aesthetic'
         Bg         = '#000000'
         Surface    = '#080810'
         Overlay    = '#101018'

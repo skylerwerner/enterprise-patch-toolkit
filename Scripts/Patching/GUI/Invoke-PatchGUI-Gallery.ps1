@@ -240,7 +240,7 @@ function New-ThemeCard {
 
     $vibe = New-Object System.Windows.Controls.TextBlock
     $vibe.Text = $Theme.Vibe
-    $vibe.FontSize = 10
+    $vibe.FontSize = 12
     $vibe.Foreground = [Windows.Media.BrushConverter]::new().ConvertFrom($Theme.SubText)
     $vibe.Margin = [System.Windows.Thickness]::new(0,2,0,0)
     $vibe.TextWrapping = 'Wrap'
