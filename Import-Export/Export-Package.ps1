@@ -28,7 +28,7 @@
         .\Export-Package.ps1
         Full export of all project files.
     .EXAMPLE
-        .\Export-Package.ps1 -ReferenceExport ".\Export_20260319"
+        .\Export-Package.ps1 -ReferenceExport ".\Package_20260319"
         Delta export containing only files changed since the 2026-03-19 package.
 #>
 
@@ -187,7 +187,7 @@ if ($ReferenceExport) {
 
 
 $formattedDate = Get-Date -Format 'yyyyMMdd'
-$folderPrefix  = if ($isDelta) { "Delta_$formattedDate" } else { "Export_$formattedDate" }
+$folderPrefix  = if ($isDelta) { "Delta_$formattedDate" } else { "Package_$formattedDate" }
 
 $exportFolder = Join-Path $destFolder $folderPrefix
 if (Test-Path $exportFolder) {
@@ -216,13 +216,14 @@ $excludePatterns = @(
     '[\\/]\.gitattributes$',
     '[\\/]\.vscode[\\/]',
     '[\\/]PSScriptAnalyzerSettings\.psd1$',
-    '[\\/]Export_(Flat_)?[\d]',
+    '[\\/](Package|Export)_(Flat_)?[\d]',
     '[\\/](Export_)?Delta_',
     '[\\/]SwitchBackups[\\/]',
     'Working',
     'Final Upload',
     '[\\/]desktop\.ini$',
-    '[\\/]_MANIFEST\.txt$'
+    '[\\/]_MANIFEST\.txt$',
+    '[\\/]_DELETIONS\.txt$'
 )
 
 $files = $allFiles | Where-Object {
@@ -418,7 +419,7 @@ if ($isDelta) {
     Write-Host "  $deltaTotal file(s) will be exported." -ForegroundColor Cyan
 
     if ($deletedFiles.Count -gt 0) {
-        Write-Host "  $($deletedFiles.Count) deleted file(s) noted (must be removed manually on import)." -ForegroundColor DarkGray
+        Write-Host "  $($deletedFiles.Count) deleted file(s) recorded in _DELETIONS.txt (Import-Package will apply them by default)." -ForegroundColor DarkGray
     }
 
     Write-Host ""
@@ -501,6 +502,21 @@ if ($isDelta) {
 # Write manifest as first file in the export
 $manifestPath = Join-Path $exportFolder '_MANIFEST.txt'
 $manifest | Out-File -FilePath $manifestPath -Encoding UTF8
+
+
+# In delta mode, persist the deletion set so Import-Package can apply it
+# (default) or be told to skip it (-SkipDeletions). Hashes come from the
+# reference manifest so the importer SHA-gates each deletion.
+if ($isDelta -and $deletedFiles.Count -gt 0) {
+    $deletions = [System.Collections.Generic.List[string]]::new()
+    $deletions.Add("OriginalPath`tSHA256")
+    foreach ($delPath in $deletedFiles) {
+        $oldHash = $refHashes[$delPath]
+        $deletions.Add("$delPath`t$oldHash")
+    }
+    $deletionsPath = Join-Path $exportFolder '_DELETIONS.txt'
+    $deletions | Out-File -FilePath $deletionsPath -Encoding UTF8
+}
 
 
 #endregion --- Build Manifest & Copy Files ---

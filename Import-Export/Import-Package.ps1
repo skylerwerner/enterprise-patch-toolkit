@@ -8,10 +8,14 @@
         copies files to their correct locations, strips the .txt extension, and unblocks them.
 
         Features:
-            -WhatIf   Dry-run mode. Shows what would be created/overwritten without making changes.
-            -Undo     Restores the most recent pre-import backup, reversing the last import.
+            -WhatIf           Dry-run mode. Shows what would be created/overwritten without making changes.
+            -Undo             Restores the most recent pre-import backup, reversing the last import.
+            -SkipDeletions    Opt out of applying deletions listed in _DELETIONS.txt. By default,
+                              deletions are applied when every target file's SHA256 matches the
+                              reference -- divergent files are always skipped, and the run prompts
+                              for confirmation if any are skipped.
 
-        Before overwriting any existing file, a backup is saved to _PreImport_Backup_<date>/
+        Before overwriting or deleting any existing file, a backup is saved to _PreImport_Backup_<date>/
         inside the destination folder. The backup manifest tracks every change so -Undo can
         reverse the operation cleanly.
 
@@ -22,7 +26,10 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     # Reverse the most recent import using the backup folder
-    [switch]$Undo
+    [switch]$Undo,
+
+    # Opt out of applying deletions listed in _DELETIONS.txt (default: apply)
+    [switch]$SkipDeletions
 )
 
 [void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
@@ -101,7 +108,10 @@ if ($Undo.IsPresent) {
     foreach ($entry in $entries) {
         $originalPath = Join-Path $targetFolder $entry.RelativePath
 
-        if ($entry.Action -eq 'Overwritten') {
+        if ($entry.Action -eq 'Overwritten' -or $entry.Action -eq 'Deleted') {
+            # Overwritten: destination file was replaced by the import; backup has the original.
+            # Deleted:     destination file was removed by the import; backup has the original.
+            # Both cases restore by moving the backup copy back to the original path.
             $backupFile = Join-Path $latestBackup.FullName $entry.BackupName
 
             if (Test-Path $backupFile) {
@@ -238,6 +248,126 @@ $entries = @($entries)
 
 
 #endregion --- Read Manifest ---
+
+
+
+#region --- Read & Classify Deletions ---
+
+
+# _DELETIONS.txt is written by Export-Package when a delta export detects
+# files that existed in the reference but are missing from the current source.
+# Format: tab-delimited, header 'OriginalPath<TAB>SHA256', one row per deletion.
+$deletionsPath   = Join-Path $sourceFolder '_DELETIONS.txt'
+$deletionEntries = @()
+
+if (Test-Path $deletionsPath) {
+    $deletionLines = Get-Content $deletionsPath | Select-Object -Skip 1
+    foreach ($line in $deletionLines) {
+        $parts = $line -split "`t"
+        if ($parts.Count -ge 2 -and $parts[0].Length -gt 0) {
+            $deletionEntries += [PSCustomObject]@{
+                Path         = $parts[0]
+                ExpectedHash = $parts[1]
+            }
+        }
+    }
+}
+
+# Classify each deletion candidate by comparing the destination file's
+# current SHA256 against the hash recorded in _DELETIONS.txt. Only files
+# whose hash matches the reference copy are safe to delete -- anything
+# else has been modified locally and is skipped to protect user work.
+$deletionsToDelete    = @()
+$deletionsDivergent   = @()
+$deletionsAlreadyGone = @()
+
+foreach ($d in $deletionEntries) {
+    $targetPath = Join-Path $destFolder $d.Path
+
+    if (-not (Test-Path $targetPath)) {
+        $deletionsAlreadyGone += $d
+        continue
+    }
+
+    $currentHash = (Get-FileHash -Path $targetPath -Algorithm SHA256).Hash
+    if ($currentHash -eq $d.ExpectedHash) {
+        $deletionsToDelete += $d
+    }
+    else {
+        $deletionsDivergent += [PSCustomObject]@{
+            Path         = $d.Path
+            ExpectedHash = $d.ExpectedHash
+            CurrentHash  = $currentHash
+        }
+    }
+}
+
+if ($deletionEntries.Count -gt 0) {
+    Write-Host ""
+    Write-Host "--- Deletions noted in package ($($deletionEntries.Count)) ---" -ForegroundColor DarkGray
+
+    if ($deletionsToDelete.Count -gt 0) {
+        Write-Host "  Deletable (hash matches):     $($deletionsToDelete.Count)" -ForegroundColor Green
+        foreach ($d in $deletionsToDelete) {
+            Write-Host "    - $($d.Path)" -ForegroundColor Green
+        }
+    }
+    if ($deletionsDivergent.Count -gt 0) {
+        Write-Host "  Skipped (locally modified):   $($deletionsDivergent.Count)" -ForegroundColor Yellow
+        foreach ($d in $deletionsDivergent) {
+            Write-Host "    ! $($d.Path)" -ForegroundColor Yellow
+            Write-Host "      expected $($d.ExpectedHash.Substring(0, [Math]::Min(12, $d.ExpectedHash.Length)))...  current $($d.CurrentHash.Substring(0, [Math]::Min(12, $d.CurrentHash.Length)))..." -ForegroundColor DarkGray
+        }
+    }
+    if ($deletionsAlreadyGone.Count -gt 0) {
+        Write-Host "  Already absent:               $($deletionsAlreadyGone.Count)" -ForegroundColor DarkGray
+        foreach ($d in $deletionsAlreadyGone) {
+            Write-Host "    . $($d.Path)" -ForegroundColor DarkGray
+        }
+    }
+    Write-Host ""
+}
+
+# Decide whether to apply deletions. Default behavior:
+#   - All classifications clean (no divergent): auto-apply, no prompt.
+#   - Any divergent files:                      prompt (user attention warranted).
+#   - -SkipDeletions passed:                    skip regardless.
+#   - -WhatIf:                                  describe what would happen, mutate nothing.
+$applyDeletions = $false
+if ($deletionsToDelete.Count -gt 0) {
+    if ($SkipDeletions.IsPresent) {
+        Write-Host "  Skipped (-SkipDeletions passed)." -ForegroundColor DarkGray
+        Write-Host ""
+    }
+    elseif ($WhatIfPreference) {
+        if ($deletionsDivergent.Count -gt 0) {
+            Write-Host "  (WhatIf: would prompt before applying $($deletionsToDelete.Count) deletion(s); $($deletionsDivergent.Count) divergent would be skipped.)" -ForegroundColor Cyan
+        }
+        else {
+            Write-Host "  (WhatIf: would auto-apply $($deletionsToDelete.Count) deletion(s).)" -ForegroundColor Cyan
+        }
+        Write-Host ""
+    }
+    elseif ($deletionsDivergent.Count -gt 0) {
+        # Some target files have locally modified content. Those are always
+        # preserved; still prompt so the user acknowledges the mixed outcome.
+        $confirm = Read-Host "$($deletionsDivergent.Count) divergent file(s) above will be kept. Proceed with the other $($deletionsToDelete.Count) deletion(s)? [Y/n]"
+        if ($confirm -eq '' -or $confirm -match '^[Yy]') {
+            $applyDeletions = $true
+        }
+        else {
+            Write-Host "Deletions skipped; file copies will still proceed." -ForegroundColor Yellow
+            Write-Host ""
+        }
+    }
+    else {
+        # All clean hash matches -- apply without prompting.
+        $applyDeletions = $true
+    }
+}
+
+
+#endregion --- Read & Classify Deletions ---
 
 
 
@@ -429,6 +559,40 @@ foreach ($entry in $entries) {
 }
 
 
+# --- Apply deletions (when $applyDeletions was set above) ---
+# Re-verify hash just before each delete to catch any last-second change,
+# then back up the file into the same _PreImport_Backup_ folder so -Undo
+# can restore it.
+$deletedAppliedCount = 0
+$deletedSkippedCount = 0
+
+if ($applyDeletions) {
+    foreach ($d in $deletionsToDelete) {
+        $targetPath = Join-Path $destFolder $d.Path
+
+        if (-not (Test-Path $targetPath)) {
+            $deletedSkippedCount++
+            continue
+        }
+
+        $currentHash = (Get-FileHash -Path $targetPath -Algorithm SHA256).Hash
+        if ($currentHash -ne $d.ExpectedHash) {
+            Write-Host "  SKIP (hash changed during import): $($d.Path)" -ForegroundColor Yellow
+            $deletedSkippedCount++
+            continue
+        }
+
+        $backupName = ($d.Path -replace '[\\/]', '--')
+        Copy-Item $targetPath -Destination (Join-Path $backupFolder $backupName)
+        $backupManifest.Add("$backupName`t$($d.Path)`tDeleted")
+        $backedUpCount++
+
+        Remove-Item -LiteralPath $targetPath -Force
+        $deletedAppliedCount++
+    }
+}
+
+
 # Write backup manifest
 $backupManifestPath = Join-Path $backupFolder '_BACKUP_MANIFEST.txt'
 $backupManifest | Out-File -FilePath $backupManifestPath -Encoding UTF8
@@ -455,6 +619,15 @@ if ($unbundledCount -gt 0) {
 Write-Host "  Files skipped:     $skippedCount"
 Write-Host "  Dirs created:      $($dirsCreated.Count)"
 Write-Host "  Files backed up:   $backedUpCount"
+if ($deletionEntries.Count -gt 0) {
+    Write-Host "  Deletions applied: $deletedAppliedCount"
+    if ($deletionsDivergent.Count -gt 0) {
+        Write-Host "  Deletions skipped: $($deletionsDivergent.Count) divergent, $($deletionsAlreadyGone.Count) already absent" -ForegroundColor DarkGray
+    }
+    elseif ($deletionsAlreadyGone.Count -gt 0) {
+        Write-Host "  Deletions skipped: $($deletionsAlreadyGone.Count) already absent" -ForegroundColor DarkGray
+    }
+}
 Write-Host "  Backup location:   $backupFolder"
 Write-Host ""
 Write-Host "To preview before importing, run:" -ForegroundColor Gray

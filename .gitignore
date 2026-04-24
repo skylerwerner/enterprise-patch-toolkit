@@ -3,6 +3,7 @@ Scripts/Patching/SwitchBackups/*.bak
 
 # Export output folders
 Export_*/
+Package_*/
 Delta_*/
 
 # Working / staging folders
