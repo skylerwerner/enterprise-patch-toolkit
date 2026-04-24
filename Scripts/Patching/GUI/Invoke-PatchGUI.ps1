@@ -733,6 +733,19 @@ $(Build-ToggleOnBgXaml -Theme $script:activeTheme)
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Default ToolTip: cap width and wrap the text so long
+             param descriptions don't stretch across the whole screen. -->
+        <Style TargetType="ToolTip">
+            <Setter Property="MaxWidth" Value="320"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="24">
@@ -781,15 +794,18 @@ $(Build-TitleXaml -Theme $script:activeTheme)
                                FontSize="11" FontWeight="SemiBold"
                                Foreground="{StaticResource SubText}"
                                VerticalAlignment="Center"
-                               Margin="0,0,10,0"/>
+                               Margin="0,0,10,0"
+                               ToolTip="Audit mode: check installed versions without patching (runs Invoke-Version)."/>
                     <CheckBox Name="tglMode" IsChecked="True"
                               Style="{StaticResource ModeToggle}"
-                              VerticalAlignment="Center"/>
+                              VerticalAlignment="Center"
+                              ToolTip="Toggle between Patch and Audit modes."/>
                     <TextBlock Name="lblModePatch" Text="PATCH"
                                FontSize="11" FontWeight="SemiBold"
                                Foreground="{StaticResource Text}"
                                VerticalAlignment="Center"
-                               Margin="10,0,0,0"/>
+                               Margin="10,0,0,0"
+                               ToolTip="Patch mode: run the full remediation (runs Invoke-Patch)."/>
                 </StackPanel>
 
                 <!-- Action buttons.  Run background may be solid or     -->
@@ -839,10 +855,10 @@ $(Build-RunBgXaml -Theme $script:activeTheme)
                               FontSize="13" IsEditable="True"/>
 
                     <TextBlock Grid.Column="3" Style="{StaticResource LabelStyle}"
-                               Text="Machine"/>
+                               Text="Machine"
+                               ToolTip="Single computer name or path to a .txt list file."/>
                     <TextBox Grid.Column="4" Name="txtMachine"
-                             FontSize="13" Margin="0,0,8,0"
-                             ToolTip="Single computer name or path to a .txt list file"/>
+                             FontSize="13" Margin="0,0,8,0"/>
                     <Button Grid.Column="5" Name="btnBrowse" Content="Browse"
                             Width="72" FontSize="12" Margin="0,0,8,0"/>
                     <Button Grid.Column="6" Name="btnEdit" Content="Edit"
@@ -860,24 +876,29 @@ $(Build-RunBgXaml -Theme $script:activeTheme)
                     <!-- Switches (collapsed in Version mode) -->
                     <WrapPanel Name="pnlSwitches" Grid.Column="0" VerticalAlignment="Center">
                         <CheckBox Name="chkForce"       Style="{StaticResource CheckBoxStyle}"
-                                  Content="Force"/>
+                                  Content="Force"
+                                  ToolTip="Run the patch on every targeted machine, including ones already compliant with the target version and ones with no detectable version info (e.g. folder-based installs)."/>
                         <CheckBox Name="chkNoCopy"      Style="{StaticResource CheckBoxStyle}"
-                                  Content="NoCopy"/>
+                                  Content="NoCopy"
+                                  ToolTip="Skip copying installer files to the target machines. Use when the installer is already local."/>
                         <CheckBox Name="chkCollectLogs" Style="{StaticResource CheckBoxStyle}"
-                                  Content="CollectLogs"/>
+                                  Content="CollectLogs"
+                                  ToolTip="After patching, pull per-machine install logs back from each remote machine."/>
                     </WrapPanel>
 
                     <!-- Timeouts (collapsed in Version mode) -->
                     <StackPanel Name="pnlTimeouts" Grid.Column="1" Orientation="Horizontal">
                         <TextBlock Style="{StaticResource LabelStyle}"
-                                   Text="Copy Timeout"/>
+                                   Text="Copy Timeout"
+                                   ToolTip="Forced copy timeout in minutes (0-120). Overrides the default dynamic timeout based on file size."/>
                         <TextBox Name="txtCopyTimeout" Width="55"
                                  FontSize="13" Margin="0,0,4,0"/>
                         <TextBlock Style="{StaticResource LabelStyle}"
                                    Text="min" Foreground="{StaticResource Info}"
                                    Margin="0,0,20,0"/>
                         <TextBlock Style="{StaticResource LabelStyle}"
-                                   Text="Total Timeout"/>
+                                   Text="Total Timeout"
+                                   ToolTip="Forced patching timeout in minutes (0-240). Caps how long each machine's install is allowed to run before it's killed as timed-out."/>
                         <TextBox Name="txtTimeout" Width="55"
                                  FontSize="13" Margin="0,0,4,0"/>
                         <TextBlock Style="{StaticResource LabelStyle}"
