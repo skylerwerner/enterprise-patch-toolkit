@@ -90,7 +90,14 @@ function Invoke-Patch {
         # Used by Invoke-PatchGUI to capture results from a background runspace.
         [Parameter(Position = 9)]
         [Switch]
-        $PassThru
+        $PassThru,
+
+        # Synchronized hashtable the GUI can poll for per-machine progress
+        # (Computer -> @{ State, Phase, StartTime, Elapsed }). Passed through
+        # to Invoke-RunspacePool, which owns the mirroring.
+        [Parameter(Position = 10)]
+        [Hashtable]
+        $ProgressSink
     )
 
 
@@ -1010,6 +1017,9 @@ function Invoke-Patch {
 
         if ($confirmTimeout.IsPresent) {
             $runspaceParams.ConfirmTimeout = $true
+        }
+        if ($null -ne $ProgressSink) {
+            $runspaceParams.ProgressSink = $ProgressSink
         }
         if ($verbose) {
             Write-Host ""

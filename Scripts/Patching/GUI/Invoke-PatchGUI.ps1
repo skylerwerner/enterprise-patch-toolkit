@@ -913,8 +913,43 @@ $(Build-ProgressFgXaml -Theme $script:activeTheme)
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Style="{StaticResource SectionHeader}"
+                <TextBlock Grid.Row="0" Name="lblResultsHeader"
+                           Style="{StaticResource SectionHeader}"
                            Text="Results" Margin="0,0,0,10"/>
+
+                <!-- Scrollbar visibility is pinned (Horizontal=Disabled
+                     since the State column fills available width, and
+                     Vertical=Visible so the auto-show/hide can't fire
+                     on every pollTimer tick). Update-ProgressGrid does
+                     Items.Clear + re-add every tick, which triggers a
+                     layout pass; with Auto scrollbars the ScrollViewer
+                     briefly shows bars mid-layout when the window is
+                     sized near the content boundary, producing a flicker
+                     that's most visible on the right and bottom edges. -->
+                <DataGrid Grid.Row="1" Name="dgProgress"
+                          Visibility="Collapsed"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ScrollViewer.VerticalScrollBarVisibility="Visible"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserSortColumns="False"
+                          CanUserReorderColumns="False"
+                          CanUserResizeColumns="True"
+                          GridLinesVisibility="None"
+                          HeadersVisibility="Column"
+                          AlternatingRowBackground="{StaticResource Overlay}"
+                          Background="{StaticResource Surface}"
+                          RowBackground="{StaticResource Surface}"
+                          Foreground="{StaticResource Text}"
+                          BorderThickness="0"
+                          FontSize="13">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Computer" Binding="{Binding Computer}"       Width="200"/>
+                        <DataGridTextColumn Header="Elapsed"  Binding="{Binding ElapsedDisplay}" Width="90"/>
+                        <DataGridTextColumn Header="Phase"    Binding="{Binding Phase}"          Width="170"/>
+                        <DataGridTextColumn Header="State"    Binding="{Binding State}"          Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
 
                 <DataGrid Grid.Row="1" Name="dgResults"
                           AutoGenerateColumns="False"
@@ -957,11 +992,11 @@ $(Build-ProgressFgXaml -Theme $script:activeTheme)
                        Foreground="{StaticResource Info}" FontSize="12"
                        VerticalAlignment="Center" Text=""/>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
-                <Button Name="btnTheme" Content="Theme..."
+                <Button Name="btnTheme" Content="Theme"
                         Width="90" Height="30" FontSize="12"
                         Margin="0,0,14,0"
                         ToolTip="Pick a theme. Opens the Gallery."/>
-                <Button Name="btnSort" Content="Default Sort"
+                <Button Name="btnSort" Content="Sort"
                         Width="110" Height="30" FontSize="12"
                         Margin="0,0,8,0" IsEnabled="False"/>
                 <Button Name="btnExport" Content="Export CSV"
@@ -990,6 +1025,7 @@ $controlNames = @(
     'pnlTimeouts', 'txtCopyTimeout', 'txtTimeout',
     'btnRun', 'btnCancel',
     'pnlProgress', 'lblStatus', 'prgBar',
+    'lblResultsHeader', 'dgProgress',
     'dgResults', 'lblResultCount', 'btnSort', 'btnExport', 'btnTheme'
 )
 foreach ($name in $controlNames) {
@@ -1117,6 +1153,33 @@ $script:asyncHandle    = $null
 $script:isRunning      = $false
 $script:resultData     = @()
 
+# Synchronized hashtable shared with the background runspace for live
+# per-machine progress. Populated by Invoke-RunspacePool's ProgressSink
+# parameter; read by the polling DispatcherTimer to refresh dgProgress.
+# Reset on every run -- stale entries from a previous run must not bleed
+# into the next one's table.
+$script:progressSink   = $null
+
+# Sort-order hint for state categories in the progress grid.
+$script:progressStateOrder = @{
+    'Running'   = 1
+    'Completed' = 2
+    'Failed'    = 3
+    'Queued'    = 4
+}
+
+# Phase-order hint within Running (higher = further along the pipeline),
+# matching Invoke-RunspacePool's sort so GUI and terminal stay consistent.
+$script:progressPhaseOrder = @{
+    'Pinging'       = 1
+    'Probing WinRM' = 1
+    'DNS Lookup'    = 2
+    'Version Check' = 3
+    'Copying Files' = 4
+    'Patching'      = 5
+    'Verifying'     = 6
+}
+
 
 # ============================================================================
 #  Browse button
@@ -1178,11 +1241,127 @@ $btnEdit.Add_Click({
 
 
 # ============================================================================
+#  Helpers: progress view plumbing
+# ============================================================================
+
+function Format-ElapsedSpan {
+    param([TimeSpan]$Span)
+    if ($null -eq $Span -or $Span.Ticks -le 0) { return '-' }
+    if ($Span.TotalMinutes -ge 1) {
+        return "{0}m {1:D2}s" -f [math]::Floor($Span.TotalMinutes), $Span.Seconds
+    }
+    return "{0}s" -f [math]::Floor($Span.TotalSeconds)
+}
+
+function Show-ProgressView {
+    # Swap the Results slot to show the live progress grid. Header flips
+    # to "Progress" so the user knows the table is mutating in place.
+    $lblResultsHeader.Text = 'Progress'
+    $dgResults.Visibility  = [System.Windows.Visibility]::Collapsed
+    $dgProgress.Visibility = [System.Windows.Visibility]::Visible
+    $dgProgress.Items.Clear()
+}
+
+function Show-ResultsView {
+    # Restore the completed-run layout.
+    $lblResultsHeader.Text = 'Results'
+    $dgProgress.Visibility = [System.Windows.Visibility]::Collapsed
+    $dgResults.Visibility  = [System.Windows.Visibility]::Visible
+    $dgProgress.Items.Clear()
+}
+
+function Update-ProgressGrid {
+    # Reads the synchronized ProgressSink the background runspace writes
+    # to and re-renders dgProgress + status line + determinate progress
+    # bar. Safe to call on every DispatcherTimer tick.
+    if ($null -eq $script:progressSink) { return }
+
+    # Snapshot the sink under its SyncRoot so we don't fight the writer
+    # mid-enumeration. Invoke-RunspacePool seeds every key up front and
+    # only mutates values afterward, but the lock costs almost nothing
+    # and keeps us safe against future changes on the producer side.
+    $snapshot = @()
+    $sync = $script:progressSink
+    [System.Threading.Monitor]::Enter($sync.SyncRoot)
+    try {
+        foreach ($v in $sync.Values) { $snapshot += ,$v }
+    }
+    finally {
+        [System.Threading.Monitor]::Exit($sync.SyncRoot)
+    }
+
+    if ($snapshot.Count -eq 0) { return }
+
+    # Counts for the status line and progress bar
+    $total     = $snapshot.Count
+    $completed = @($snapshot | Where-Object { $_.State -eq 'Completed' }).Count
+    $failed    = @($snapshot | Where-Object { $_.State -eq 'Failed' }).Count
+    $running   = @($snapshot | Where-Object { $_.State -eq 'Running' }).Count
+    $queued    = @($snapshot | Where-Object { $_.State -eq 'Queued' }).Count
+    $done      = $completed + $failed
+
+    # Sort: Running first (by phase DESC so further-along phases surface
+    # near the top, then by earliest StartTime), then Completed, Failed,
+    # Queued. Within each non-Running bucket, sort alphabetically.
+    $sorted = $snapshot | Sort-Object @(
+        @{ Expression = {
+            $s = $_.State
+            if ($script:progressStateOrder.ContainsKey($s)) { $script:progressStateOrder[$s] }
+            else { 99 }
+        }; Ascending = $true }
+        @{ Expression = {
+            if ($_.State -eq 'Running' -and $_.Phase -and $script:progressPhaseOrder.ContainsKey($_.Phase)) {
+                $script:progressPhaseOrder[$_.Phase]
+            } else { 0 }
+        }; Descending = $true }
+        @{ Expression = {
+            if ($_.State -eq 'Running' -and $_.StartTime) { $_.StartTime } else { [DateTime]::MaxValue }
+        }; Ascending = $true }
+        @{ Expression = { $_.Computer }; Ascending = $true }
+    )
+
+    $rows = foreach ($entry in $sorted) {
+        $phaseDisplay = if ($entry.Phase) { [string]$entry.Phase } else { '-' }
+        # Elapsed is only meaningful while a machine is Running. Once
+        # it lands in Completed/Failed/Queued the counter stops being
+        # useful, so blank it out instead of letting it keep ticking
+        # (live path) or freezing at a stale value (DryRun path).
+        $elapsedDisplay = if ($entry.State -eq 'Running') {
+            Format-ElapsedSpan $entry.Elapsed
+        } else { '-' }
+        [PSCustomObject]@{
+            Computer       = [string]$entry.Computer
+            ElapsedDisplay = $elapsedDisplay
+            Phase          = $phaseDisplay
+            State          = [string]$entry.State
+        }
+    }
+
+    $dgProgress.Items.Clear()
+    foreach ($row in $rows) {
+        $dgProgress.Items.Add($row) > $null
+    }
+
+    $pct = if ($total -gt 0) { [int](($done / $total) * 100) } else { 0 }
+    $prgBar.IsIndeterminate = $false
+    $prgBar.Value = $pct
+
+    $runLabel = if ($script:mode -eq 'Version') { 'version check' } else { 'patching' }
+    $sw = if ($script:selectedSoftware) { $script:selectedSoftware } else { $cmbSoftware.Text }
+    $lblStatus.Text = "Running $sw $runLabel... $done / $total complete (Running: $running  Queued: $queued  Failed: $failed)"
+}
+
+
+# ============================================================================
 #  Helper: Populate results grid and update footer/progress
 # ============================================================================
 
 function Complete-RunWithResults {
     param([array]$Results)
+
+    # Flip back to the static results grid before repopulating it.
+    # No-op on DryRun since Show-ProgressView was never called there.
+    Show-ResultsView
 
     # Flatten any array-valued display properties before binding
     $displayRows = @($Results | ConvertTo-DisplayRow)
@@ -1278,38 +1457,159 @@ $btnRun.Add_Click({
 
         $dryLabel = if ($script:mode -eq 'Version') { 'version check' }
                     else                            { 'patching' }
-        $dryCount = if ($script:dryRunNames.Count) { $script:dryRunNames.Count } else { 15 }
+
+        # Pre-roll mock results up front so every simulated machine has
+        # a known final status. The phase plan below keys off that
+        # status so what the user watches in the progress grid lines up
+        # with what lands in the results grid.
+        $mockParams = @{
+            SoftwareName = $selectedSoftware
+            Count        = 15
+            Mode         = $script:mode
+        }
+        if ($script:dryRunNames -and $script:dryRunNames.Count -gt 0) {
+            $mockParams.ComputerName = $script:dryRunNames
+        }
+        $script:dryRunMocks = @(New-MockPatchResults @mockParams)
+        $dryCount = $script:dryRunMocks.Count
+
         $lblStatus.Text         = "[DryRun] Simulating $selectedSoftware $dryLabel on $dryCount machines..."
-        $prgBar.IsIndeterminate = $true
+        $prgBar.IsIndeterminate = $false
+        $prgBar.Value           = 0
+
+        # Build per-machine phase plans. Durations mirror the real-run
+        # shape compressed so a dry run finishes in well under a minute
+        # while staying proportional: Copy/Patch dominate, probes and
+        # verification are quick. Random ranges give the grid some
+        # visible jitter instead of lockstep progression.
+        $isVersionModeDry = ($script:mode -eq 'Version')
+        $rngDry           = New-Object System.Random
+        $plans            = @{}
+
+        foreach ($mock in $script:dryRunMocks) {
+            $phases = New-Object System.Collections.Generic.List[object]
+            $phases.Add(@{ Name='Pinging'; Seconds=$rngDry.Next(1, 4) }) > $null
+
+            switch ($mock.Status) {
+                'Offline' {
+                    # Ping failed, WinRM probe failed -> stop here.
+                    $phases.Add(@{ Name='Probing WinRM'; Seconds=$rngDry.Next(2, 6) }) > $null
+                }
+                'Isolated' {
+                    # Ping failed but WinRM probe succeeded, run continues.
+                    $phases.Add(@{ Name='Probing WinRM'; Seconds=$rngDry.Next(2, 6) }) > $null
+                    $phases.Add(@{ Name='Version Check'; Seconds=$rngDry.Next(2, 6) }) > $null
+                    if (-not $isVersionModeDry) {
+                        $phases.Add(@{ Name='Copying Files'; Seconds=$rngDry.Next(10, 16) }) > $null
+                        $phases.Add(@{ Name='Patching';      Seconds=$rngDry.Next(10, 16) }) > $null
+                        $phases.Add(@{ Name='Verifying';     Seconds=$rngDry.Next(1, 4)  }) > $null
+                    }
+                }
+                default {
+                    # Online: straight to version check and (if patching) the install.
+                    $phases.Add(@{ Name='Version Check'; Seconds=$rngDry.Next(2, 6) }) > $null
+                    if (-not $isVersionModeDry) {
+                        $phases.Add(@{ Name='Copying Files'; Seconds=$rngDry.Next(10, 16) }) > $null
+                        $phases.Add(@{ Name='Patching';      Seconds=$rngDry.Next(10, 16) }) > $null
+                        $phases.Add(@{ Name='Verifying';     Seconds=$rngDry.Next(1, 4)  }) > $null
+                    }
+                }
+            }
+
+            $plans[$mock.ComputerName] = [PSCustomObject]@{
+                Computer    = $mock.ComputerName
+                Phases      = $phases
+                PhaseIndex  = -1
+                StartTime   = $null
+                PhaseEndsAt = $null
+                State       = 'Queued'
+                Phase       = $null
+            }
+        }
+        $script:dryRunPlans = $plans
+
+        # Hardcoded concurrent cap so the Queued bucket is visible on
+        # larger target lists. Matches the rough throttle Invoke-Patch
+        # uses in live runs against a single share.
+        $script:dryRunThrottle = 8
+
+        # Seed the progress sink so Update-ProgressGrid has rows to
+        # render on tick 1 (every machine starts Queued).
+        $script:progressSink = [Hashtable]::Synchronized(@{})
+        foreach ($plan in $plans.Values) {
+            $script:progressSink[$plan.Computer] = @{
+                Computer  = $plan.Computer
+                StartTime = $null
+                Elapsed   = [TimeSpan]::Zero
+                Phase     = $null
+                State     = 'Queued'
+            }
+        }
+        Show-ProgressView
+        Update-ProgressGrid
 
         $script:dryRunTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:dryRunTimer.Interval = [TimeSpan]::FromSeconds(3)
-        $script:dryRunStep  = 0
-        $script:dryRunTotal = 4
+        $script:dryRunTimer.Interval = [TimeSpan]::FromMilliseconds(250)
 
         $script:dryRunTimer.Add_Tick({
-            $script:dryRunStep++
+            $now   = [DateTime]::Now
+            $plans = $script:dryRunPlans
 
-            if ($script:dryRunStep -lt $script:dryRunTotal) {
-                # Progress updates to simulate activity
-                $pct = [math]::Round(($script:dryRunStep / $script:dryRunTotal) * 100)
-                $prgBar.IsIndeterminate = $false
-                $prgBar.Value = $pct
-                $lblStatus.Text = "[DryRun] Simulating... $pct%"
+            # Advance any Running machine past a phase whose clock has expired.
+            foreach ($plan in $plans.Values) {
+                if ($plan.State -ne 'Running') { continue }
+                if ($now -lt $plan.PhaseEndsAt) { continue }
+
+                $plan.PhaseIndex++
+                if ($plan.PhaseIndex -ge $plan.Phases.Count) {
+                    $plan.State       = 'Completed'
+                    $plan.Phase       = $null
+                    $plan.PhaseEndsAt = $null
+                }
+                else {
+                    $next             = $plan.Phases[$plan.PhaseIndex]
+                    $plan.Phase       = $next.Name
+                    $plan.PhaseEndsAt = $now.AddSeconds($next.Seconds)
+                }
             }
-            else {
-                # Done - generate and display mock results
-                $script:dryRunTimer.Stop()
 
-                $mockParams = @{
-                    SoftwareName = $script:selectedSoftware
-                    Count        = 15
-                    Mode         = $script:mode
+            # Promote Queued machines up to the throttle cap.
+            $runningCount = @($plans.Values | Where-Object { $_.State -eq 'Running' }).Count
+            foreach ($plan in $plans.Values) {
+                if ($runningCount -ge $script:dryRunThrottle) { break }
+                if ($plan.State -ne 'Queued') { continue }
+
+                $plan.State       = 'Running'
+                $plan.PhaseIndex  = 0
+                $plan.StartTime   = $now
+                $first            = $plan.Phases[0]
+                $plan.Phase       = $first.Name
+                $plan.PhaseEndsAt = $now.AddSeconds($first.Seconds)
+                $runningCount++
+            }
+
+            # Mirror plan state into the sink so Update-ProgressGrid
+            # consumes the same contract the live path writes.
+            foreach ($plan in $plans.Values) {
+                $elapsed = if ($plan.StartTime) { $now - $plan.StartTime } else { [TimeSpan]::Zero }
+                $script:progressSink[$plan.Computer] = @{
+                    Computer  = $plan.Computer
+                    StartTime = $plan.StartTime
+                    Elapsed   = $elapsed
+                    Phase     = $plan.Phase
+                    State     = $plan.State
                 }
-                if ($script:dryRunNames -and $script:dryRunNames.Count -gt 0) {
-                    $mockParams.ComputerName = $script:dryRunNames
-                }
-                $script:resultData = @(New-MockPatchResults @mockParams)
+            }
+
+            Update-ProgressGrid
+
+            # All machines finished -> hand off to the real results path.
+            $stillWorking = @($plans.Values | Where-Object {
+                $_.State -eq 'Queued' -or $_.State -eq 'Running'
+            }).Count
+            if ($stillWorking -eq 0) {
+                $script:dryRunTimer.Stop()
+                $script:resultData = $script:dryRunMocks
                 Complete-RunWithResults -Results $script:resultData
                 $lblStatus.Text = "[DryRun] Complete - $($script:resultData.Count) simulated results"
             }
@@ -1330,13 +1630,25 @@ $btnRun.Add_Click({
 
     $lblStatus.Text         = "Starting $selectedSoftware $modeLabel..."
     $prgBar.IsIndeterminate = $true
+    $prgBar.Value           = 0
+
+    # --- Live progress sink shared with the background runspace ---
+    # Reset per run so a previous run's machines don't linger. Swap the
+    # grid slot to show Progress immediately; rows arrive on the first
+    # pollTimer tick once Invoke-RunspacePool has seeded the sink.
+    $script:progressSink = [Hashtable]::Synchronized(@{})
+    Show-ProgressView
 
     # --- Build parameter splat as a string ---
     # -PassThru makes the cmdlet emit its results array on the pipeline
     # so the background runspace can capture and display them in the grid.
+    # -ProgressSink references a variable injected into the background
+    # runspace below -- the backtick keeps it literal through here-string
+    # interpolation so it resolves at scriptblock-execution time, not now.
     $paramParts = @()
     $paramParts += "-TargetSoftware '$selectedSoftware'"
     $paramParts += "-PassThru"
+    $paramParts += "-ProgressSink `$guiProgressSink"
 
     $machineText = $txtMachine.Text.Trim()
     if ($machineText) {
@@ -1390,6 +1702,12 @@ $btnRun.Add_Click({
     $script:runspace.ApartmentState = [System.Threading.ApartmentState]::STA
     $script:runspace.Open()
 
+    # Publish the synchronized sink into the background runspace under the
+    # name the generated invokeCmd expects (-ProgressSink $guiProgressSink).
+    # Both runspaces hold the same Hashtable reference, so writes from the
+    # Invoke-RunspacePool monitor loop are visible to the GUI immediately.
+    $script:runspace.SessionStateProxy.SetVariable('guiProgressSink', $script:progressSink)
+
     $script:psInstance = [PowerShell]::Create()
     $script:psInstance.Runspace = $script:runspace
 
@@ -1433,8 +1751,10 @@ $btnRun.Add_Click({
 
 
     # --- Start polling timer ---
+    # 1s matches Invoke-RunspacePool's internal sink refresh rate, so each
+    # tick renders fresh phase/elapsed data without lag.
     $script:pollTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:pollTimer.Interval = [TimeSpan]::FromSeconds(2)
+    $script:pollTimer.Interval = [TimeSpan]::FromSeconds(1)
 
     $script:pollTimer.Add_Tick({
 
@@ -1483,9 +1803,10 @@ $btnRun.Add_Click({
             Complete-RunWithResults -Results $script:resultData
         }
         else {
-            $runLabel = if ($script:mode -eq 'Version') { 'version check' }
-                        else                            { 'patching' }
-            $lblStatus.Text = "Running $($cmbSoftware.Text) $runLabel..."
+            # Live progress view: re-render the per-machine table and
+            # update the status line + determinate progress bar from
+            # the synchronized sink the background runspace writes.
+            Update-ProgressGrid
         }
     })
 
@@ -1510,6 +1831,10 @@ $btnCancel.Add_Click({
     if ($script:psInstance) {
         try { $script:psInstance.Stop() } catch { }
     }
+
+    # Flip the grid back to the (empty) Results view so a cancelled
+    # run doesn't leave the progress table stuck onscreen.
+    Show-ResultsView
 
     $prgBar.IsIndeterminate = $false
     $prgBar.Value = 0

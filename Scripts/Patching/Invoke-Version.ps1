@@ -48,7 +48,14 @@ function Invoke-Version {
         # terminal table. Used by the GUI to capture results from a background
         # runspace. Default off so interactive terminal use is unchanged.
         [Switch]
-        $PassThru
+        $PassThru,
+
+        # Synchronized hashtable the GUI can poll for per-machine progress
+        # (Computer -> @{ State, Phase, StartTime, Elapsed }). Passed through
+        # to Invoke-RunspacePool, which owns the mirroring.
+        [Parameter()]
+        [Hashtable]
+        $ProgressSink
 
     )
 
@@ -575,6 +582,10 @@ process {
         ThrottleLimit  = 32
         TimeoutMinutes = 5
         ActivityName   = "$software Version Check"
+    }
+
+    if ($null -ne $ProgressSink) {
+        $runspaceParams.ProgressSink = $ProgressSink
     }
 
     # Execute the version-check pipeline

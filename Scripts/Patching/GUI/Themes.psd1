@@ -291,7 +291,7 @@
         ToggleOnBorder = '#3FDCD0'
     }
 
-    CyberCommand = @{
+    CyberPunkConsole = @{
         Name       = 'CyberPunk Console'
         Vibe       = 'Neon cyan on pure black'
         Bg         = '#000000'

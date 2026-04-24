@@ -82,7 +82,18 @@ function Invoke-RunspacePool {
         # Label for progress display (e.g. "Google Chrome")
         [Parameter()]
         [String]
-        $ActivityName = "Runspace"
+        $ActivityName = "Runspace",
+
+        # Optional synchronized hashtable the caller owns. When supplied, the
+        # monitor loop mirrors per-machine state into it (keyed by computer
+        # name) every second so external observers -- notably the GUI's
+        # DispatcherTimer -- can render a live progress table without
+        # reaching into the pool's private PhaseTracker. Each entry is a
+        # hashtable with keys: Computer, StartTime, Elapsed, Phase, State.
+        # State is one of Queued, Running, Completed, Failed.
+        [Parameter()]
+        [Hashtable]
+        $ProgressSink
     )
 
 
@@ -138,6 +149,39 @@ function Invoke-RunspacePool {
                 return "{0}m {1:D2}s" -f [math]::Floor($Span.TotalMinutes), $Span.Seconds
             }
             return "{0}s" -f [math]::Floor($Span.TotalSeconds)
+        }
+
+        # Mirror current per-machine state into the caller's ProgressSink.
+        # Called once per monitor loop iteration (~1s) so GUI pollers see
+        # fresh phase + elapsed data without reading the private PhaseTracker.
+        function Update-ProgressSink {
+            if ($null -eq $ProgressSink) { return }
+            $now = [DateTime]::Now
+            foreach ($rs in $runspaces) {
+                $phase = $PhaseTracker[$rs.Computer]
+                # A runspace only enters $runspaces once it's been dispatched
+                # (Submit-NextBatch sets StartTime). Anything present here is
+                # Running unless we've already observed Completed/Failed --
+                # don't downgrade to Queued just because the scriptblock
+                # hasn't written its first PhaseTracker entry yet.
+                if     ($rs.TimedOut)  { $state = 'Failed'    }
+                elseif ($rs.Completed) { $state = 'Completed' }
+                else                   { $state = 'Running'   }
+
+                $elapsed = if ($null -ne $rs.StartTime) {
+                    $now - $rs.StartTime
+                } else {
+                    [TimeSpan]::Zero
+                }
+
+                $ProgressSink[$rs.Computer] = @{
+                    Computer  = $rs.Computer
+                    StartTime = $rs.StartTime
+                    Elapsed   = $elapsed
+                    Phase     = $phase
+                    State     = $state
+                }
+            }
         }
 
         #endregion --- Helpers ---
@@ -226,10 +270,31 @@ function Invoke-RunspacePool {
             }
         }
 
+        # Seed the ProgressSink with every target in Queued state so the GUI
+        # can render the full roster before any runspace is dispatched.
+        # Entries transition to Running/Completed/Failed via Update-ProgressSink
+        # in the monitor loop.
+        if ($null -ne $ProgressSink) {
+            foreach ($argSet in $ArgumentList) {
+                $computer = [string]$argSet[0]
+                $ProgressSink[$computer] = @{
+                    Computer  = $computer
+                    StartTime = $null
+                    Elapsed   = [TimeSpan]::Zero
+                    Phase     = $null
+                    State     = 'Queued'
+                }
+            }
+        }
+
         # Submit initial batch
         Submit-NextBatch
 
         $script:currentRunspaces = $runspaces
+
+        # Reflect the initial batch's Running state before the monitor loop's
+        # first sleep, so GUI pollers see activity within the first tick.
+        Update-ProgressSink
 
         #endregion --- Runspace Submission ---
 
@@ -274,6 +339,11 @@ function Invoke-RunspacePool {
                 # Refill slots as machines complete
                 Submit-NextBatch
                 $script:currentRunspaces = $runspaces
+
+                # Mirror current state into the caller's sink every iteration
+                # (~1 Hz) so the GUI's 2s DispatcherTimer always reads fresh
+                # phase + elapsed data.
+                Update-ProgressSink
 
                 $doneCount = @($runspaces | Where-Object { $_.Completed -or $_.TimedOut }).Count
 
@@ -591,6 +661,12 @@ function Invoke-RunspacePool {
                     [Console]::SetCursorPosition(0, $progressTop)
                 }
             }
+
+            # Final snapshot before we clear PhaseTracker. Guarantees the GUI
+            # sees every machine as Completed/Failed on its next poll, even if
+            # the last transition happened inside the monitor loop's tail
+            # sleep.
+            Update-ProgressSink
 
             # Clean up phase tracker entries for completed machines
             foreach ($rs in $runspaces) {

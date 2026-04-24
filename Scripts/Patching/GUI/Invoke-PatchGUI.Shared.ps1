@@ -19,7 +19,7 @@
         Callers currently dot-sourcing this file:
           - Invoke-PatchGUI.ps1
           - Invoke-PatchGUI-Gallery.ps1
-          - ThemeOverrides/CyberCommand.ps1
+          - ThemeOverrides/CyberPunkConsole.ps1
 
         Written by Skyler Werner
         Date: 2026/04/23

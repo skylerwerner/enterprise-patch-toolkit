@@ -25,7 +25,7 @@ contrast, readability, color discipline, and gradient use.
 
 Any helper used by more than one GUI entry point lives in
 `Invoke-PatchGUI.Shared.ps1`. XAML and named-control code stays local
-to each entry point. This came out of the first CyberCommand override:
+to each entry point. This came out of the first CyberPunkConsole override:
 the override was a fork of the canonical GUI, and every fix to the
 canonical had to be copy-pasted in or the override silently drifted.
 
